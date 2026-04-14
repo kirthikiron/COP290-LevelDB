@@ -3,6 +3,9 @@
 #include <string>
 #include "leveldb/db.h"
 
+// run: g++ -std=c++17 test_scan.cpp -o test_scan -Iinclude libleveldb.a -lpthread
+// then ./test_scan
+
 int main() {
     leveldb::DB* db;
     leveldb::Options options;

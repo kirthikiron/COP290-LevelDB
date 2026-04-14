@@ -57,7 +57,14 @@ class DBImpl : public DB {
   Status Scan(const ReadOptions& options,
             const Slice& start_key,
             const Slice& end_key,
-            std::vector<std::pair<std::string, std::string>>* result) override; 
+            std::vector<std::pair<std::string, std::string>>* result) override;
+            
+  // Range Delete API
+  Status DeleteRange(const WriteOptions& options,
+                           const Slice& start_key,
+                           const Slice& end_key) override;
+
+  //End////////////////////////////////////////////////////////////////////////
 
   // Extra methods (for testing) that are not in the public DB interface
 

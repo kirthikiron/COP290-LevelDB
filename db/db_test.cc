@@ -2137,15 +2137,23 @@ class ModelDB : public DB {
     }
   }
   ///////////////////////////////////////////////////////////////////////////////
-  // Added as the DB class is an Abstract Base Class, and when we defined a new 
-  // method in the DB class, we need to implement it here to satisfy the compiler.
+  // Added as the DB class is an Abstract Base Class, and when we defined new 
+  // methods in the DB class, we need to implement these here to satisfy the compiler.
+
   Status Scan(const ReadOptions& options,
               const Slice& start_key,
               const Slice& end_key,
               std::vector<std::pair<std::string, std::string>>* result) override {
     return Status::NotSupported("Scan not implemented in ModelDB");
   }
-  
+
+  Status DeleteRange(const WriteOptions& options,
+                     const Slice& start_key,
+                     const Slice& end_key) override {
+    return Status::NotSupported("DeleteRange not implemented in ModelDB");
+  }
+
+  //End///////////////////////////////////////////////////////////////////////
   const Snapshot* GetSnapshot() override {
     ModelSnapshot* snapshot = new ModelSnapshot;
     snapshot->map_ = map_;

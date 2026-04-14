@@ -157,6 +157,12 @@ class LEVELDB_EXPORT DB {
                     const Slice& start_key,
                     const Slice& end_key,
                     std::vector<std::pair<std::string, std::string>>* result) = 0;
+
+  // Range Delete API
+  virtual Status DeleteRange(const WriteOptions& options,
+                           const Slice& start_key,
+                           const Slice& end_key) = 0;
+  //End////////////////////////////////////////////////////////////////////////
 };
 
 // Destroy the contents of the specified database.

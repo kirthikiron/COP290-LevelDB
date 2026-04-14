@@ -1179,8 +1179,8 @@ Iterator* DBImpl::NewIterator(const ReadOptions& options) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////
-// Implementation of the Range Scan API
 
+// Implementation of the Range Scan API
 Status DBImpl::Scan(const ReadOptions& options,
                     const Slice& start_key,
                     const Slice& end_key,
@@ -1211,6 +1211,41 @@ Status DBImpl::Scan(const ReadOptions& options,
   Status s = it->status();
   return s;
 }
+
+// Implementation of the Range Delete API
+Status DBImpl::DeleteRange(const WriteOptions& options,
+                         const Slice& start_key,
+                         const Slice& end_key) {
+  // Create a WriteBatch to hold the delete operations
+  WriteBatch batch;
+
+  // We need ReadOptions to create the iterator
+  ReadOptions read_options;
+  
+  // Create the Iterator safely using modern C++
+  std::unique_ptr<Iterator> it(NewIterator(read_options));
+
+  // Loop through the exact same half-open interval as in Range Scan
+  it->Seek(start_key);
+
+  while (it->Valid() && it->key().compare(end_key) < 0) {
+       
+    // Instead of reading the value, we tell the batch to delete this specific key
+    batch.Delete(it->key());
+    it->Next();
+  }
+
+  // If the iterator crashed halfway through reading the disk, abort safely
+  // It apparently is a valid concern with hardware according to Gemini
+  if (!it->status().ok()) {
+    return it->status();
+  }
+
+  // If no such issues, we can just return the status of the write called below
+  // Push the entire batch of delete ops to the database atomically
+  return Write(options, &batch);
+}
+//End///////////////////////////////////////////////////////////////
 
 void DBImpl::RecordReadSample(Slice key) {
   MutexLock l(&mutex_);
