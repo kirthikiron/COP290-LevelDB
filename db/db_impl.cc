@@ -11,6 +11,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "db/builder.h"
 #include "db/db_iter.h"
@@ -1175,6 +1176,40 @@ Iterator* DBImpl::NewIterator(const ReadOptions& options) {
                                   ->sequence_number()
                             : latest_snapshot),
                        seed);
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+// Implementation of the Range Scan API
+
+Status DBImpl::Scan(const ReadOptions& options,
+                    const Slice& start_key,
+                    const Slice& end_key,
+                    std::vector<std::pair<std::string, std::string>>* result) {
+                    
+  // Clear the vector to be safe we are not appending to an existing vector
+  result->clear();
+
+  // Create the Iterator using unique_ptr to wrap the raw pointer 
+  // returned by NewIterator
+  std::unique_ptr<Iterator> it(NewIterator(options));
+  
+  // Seek to the start_key
+  it->Seek(start_key);
+
+  // Looping and Listing the Key-Values
+  // Continue while the iterator is valid and the current key is less than end_key
+  while (it->Valid() && it->key().compare(end_key) < 0) {
+    // Extract the key-values from the Slice objects, stringify them 
+    // and append to the result vector as k-v pairs
+    result->push_back({it->key().ToString(), it->value().ToString()});
+    
+    // Move to the next key in the database    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 .
+    it->Next();
+  }
+
+  // Check for errors and clean up memory
+  Status s = it->status();
+  return s;
 }
 
 void DBImpl::RecordReadSample(Slice key) {

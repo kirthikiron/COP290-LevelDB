@@ -2136,6 +2136,16 @@ class ModelDB : public DB {
       return new ModelIter(snapshot_state, false);
     }
   }
+  ///////////////////////////////////////////////////////////////////////////////
+  // Added as the DB class is an Abstract Base Class, and when we defined a new 
+  // method in the DB class, we need to implement it here to satisfy the compiler.
+  Status Scan(const ReadOptions& options,
+              const Slice& start_key,
+              const Slice& end_key,
+              std::vector<std::pair<std::string, std::string>>* result) override {
+    return Status::NotSupported("Scan not implemented in ModelDB");
+  }
+  
   const Snapshot* GetSnapshot() override {
     ModelSnapshot* snapshot = new ModelSnapshot;
     snapshot->map_ = map_;

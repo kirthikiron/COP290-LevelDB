@@ -7,6 +7,8 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <vector>
+#include <string>
 
 #include "leveldb/export.h"
 #include "leveldb/iterator.h"
@@ -145,6 +147,16 @@ class LEVELDB_EXPORT DB {
   // Therefore the following call will compact the entire database:
   //    db->CompactRange(nullptr, nullptr);
   virtual void CompactRange(const Slice* begin, const Slice* end) = 0;
+
+
+  //////////////////////////////////////////////////////////////////////////////
+  // New Methods of the modified LevelDB for the Assignment
+  
+  // Range Scan API. 
+  virtual Status Scan(const ReadOptions& options,
+                    const Slice& start_key,
+                    const Slice& end_key,
+                    std::vector<std::pair<std::string, std::string>>* result) = 0;
 };
 
 // Destroy the contents of the specified database.
