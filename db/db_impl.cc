@@ -543,6 +543,17 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   CompactionStats stats;
   stats.micros = env_->NowMicros() - start_micros;
   stats.bytes_written = meta.file_size;
+  /////////////////////////////////////////////////////////////////////////////////
+  //  ADDED FOR Part D: To let stats_ track MemTable flushes properly as well.
+
+  stats.compactions_executed = 1;
+  stats.input_files = 0;  // 0 because the data came from RAM, not a disk file!
+  //stats.output_files = 1; // Because we produce only one new file per memtable flush
+  // However, if the file size is 0, it means the file was deleted and should 
+  // not be counted as an output file.
+  stats.output_files = (s.ok() && meta.file_size > 0) ? 1 : 0;
+
+  //End/////////////////////////////////////////////////////////////////////////////
   stats_[level].Add(stats);
   return s;
 }
@@ -1050,7 +1061,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   stats.input_files = compact->compaction->num_input_files(0) 
                         + compact->compaction->num_input_files(1);
   stats.output_files = compact->outputs.size();
-  
+
   //End///////////////////////////////////////////////////////////////////////////////
 
   mutex_.Lock();
@@ -1254,6 +1265,51 @@ Status DBImpl::DeleteRange(const WriteOptions& options,
   // If no such issues, we can just return the status of the write called below
   // Push the entire batch of delete ops to the database atomically
   return Write(options, &batch);
+}
+
+Status DBImpl::ForceFullCompaction() {
+  // Snapshot the baseline global statistics BEFORE doing anything
+  CompactionStats start_stats;
+  for (int i = 0; i < config::kNumLevels; i++) {
+    start_stats.Add(stats_[i]);
+  }
+
+  // Flush the active MemTable to disk (Minor Compaction)
+  // This ensures all recent writes in RAM are pushed to Level 0 before we sweep.
+  TEST_CompactMemTable();
+
+  // Sequentially trigger Major Compaction for every level
+  // We loop up to config::kNumLevels - 1 (Level 5 merges into Level 6).
+  // Passing nullptr for start and end tells LevelDB to "compact the entire alphabetical range".
+  for (int level = 0; level < config::kNumLevels - 1; level++) {
+    TEST_CompactRange(level, nullptr, nullptr);
+  }
+
+  // Snapshot the ending global statistics AFTER all work is done
+  CompactionStats end_stats;
+  for (int i = 0; i < config::kNumLevels; i++) {
+    end_stats.Add(stats_[i]);
+  }
+
+  // Calculate the delta (what happened exclusively during our manual run)
+  long long total_executed = end_stats.compactions_executed - start_stats.compactions_executed;
+  long long total_input_files = end_stats.input_files - start_stats.input_files;
+  long long total_output_files = end_stats.output_files - start_stats.output_files;
+  long long total_bytes_read = end_stats.bytes_read - start_stats.bytes_read;
+  long long total_bytes_written = end_stats.bytes_written - start_stats.bytes_written;
+
+  // Print the human-readable summary required by the assignment
+  printf("\n=========================================\n");
+  printf("    MANUAL FULL COMPACTION STATISTICS    \n");
+  printf("=========================================\n");
+  printf("Compactions Executed : %lld\n", total_executed);
+  printf("Input Files          : %lld\n", total_input_files);
+  printf("Output Files         : %lld\n", total_output_files);
+  printf("Total Bytes Read     : %lld\n", total_bytes_read);
+  printf("Total Bytes Written  : %lld\n", total_bytes_written);
+  printf("=========================================\n\n");
+
+  return Status::OK();
 }
 //End///////////////////////////////////////////////////////////////
 
