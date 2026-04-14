@@ -1039,9 +1039,19 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       stats.bytes_read += compact->compaction->input(which, i)->file_size;
     }
   }
+  // Output will be a vector. So they used .size() directly
   for (size_t i = 0; i < compact->outputs.size(); i++) {
     stats.bytes_written += compact->outputs[i].file_size;
   }
+  /////////////////////////////////////////////////////////////////////////////////////
+  // Additional logic for tracking Manual Compaction stats.
+
+  stats.compactions_executed = 1;
+  stats.input_files = compact->compaction->num_input_files(0) 
+                        + compact->compaction->num_input_files(1);
+  stats.output_files = compact->outputs.size();
+  
+  //End///////////////////////////////////////////////////////////////////////////////
 
   mutex_.Lock();
   stats_[compact->compaction->level() + 1].Add(stats);

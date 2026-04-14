@@ -2153,6 +2153,10 @@ class ModelDB : public DB {
     return Status::NotSupported("DeleteRange not implemented in ModelDB");
   }
 
+  Status ForceFullCompaction() override {
+    return Status::NotSupported("ForceFullCompaction not implemented in ModelDB");
+  }
+
   //End///////////////////////////////////////////////////////////////////////
   const Snapshot* GetSnapshot() override {
     ModelSnapshot* snapshot = new ModelSnapshot;

@@ -162,6 +162,11 @@ class LEVELDB_EXPORT DB {
   virtual Status DeleteRange(const WriteOptions& options,
                            const Slice& start_key,
                            const Slice& end_key) = 0;
+
+  // Force a full manual compaction of all levels, flushing RAM first.
+  // Returns statistics about the compaction process.
+  virtual Status ForceFullCompaction() = 0;
+  
   //End////////////////////////////////////////////////////////////////////////
 };
 

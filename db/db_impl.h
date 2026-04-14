@@ -64,6 +64,9 @@ class DBImpl : public DB {
                            const Slice& start_key,
                            const Slice& end_key) override;
 
+  // Manual Full Compaction
+  Status ForceFullCompaction() override;  
+
   //End////////////////////////////////////////////////////////////////////////
 
   // Extra methods (for testing) that are not in the public DB interface
@@ -104,19 +107,37 @@ class DBImpl : public DB {
 
   // Per level compaction stats.  stats_[level] stores the stats for
   // compactions that produced data for the specified "level".
+
+  //////////////////////////////////////////////////////////////////////////
+  // Added fields to the CompactionStats struct for Part D of the assignment, 
+  // to track additional statistics fields about compactions.
+
   struct CompactionStats {
-    CompactionStats() : micros(0), bytes_read(0), bytes_written(0) {}
+    CompactionStats() 
+        : micros(0), 
+          bytes_read(0), 
+          bytes_written(0),
+          compactions_executed(0), // Added for Part D 
+          input_files(0),          // Added for Part D 
+          output_files(0) {}       // Added for Part D 
 
     void Add(const CompactionStats& c) {
       this->micros += c.micros;
       this->bytes_read += c.bytes_read;
       this->bytes_written += c.bytes_written;
+      this->compactions_executed += c.compactions_executed; // Added for Part D 
+      this->input_files += c.input_files;                   // Added for Part D 
+      this->output_files += c.output_files;                 // Added for Part D 
     }
 
     int64_t micros;
     int64_t bytes_read;
     int64_t bytes_written;
+    int64_t compactions_executed; // Added for Part D 
+    int64_t input_files;          // Added for Part D 
+    int64_t output_files;         // Added for Part D 
   };
+  //End/////////////////////////////////////////////////////////////////////////
 
   Iterator* NewInternalIterator(const ReadOptions&,
                                 SequenceNumber* latest_snapshot,
