@@ -1268,37 +1268,38 @@ Status DBImpl::DeleteRange(const WriteOptions& options,
 }
 
 Status DBImpl::ForceFullCompaction() {
-  // Snapshot the baseline global statistics BEFORE doing anything
   CompactionStats start_stats;
-  for (int i = 0; i < config::kNumLevels; i++) {
-    start_stats.Add(stats_[i]);
+  {
+    MutexLock l(&mutex_);
+    for (int i = 0; i < config::kNumLevels; i++) {
+      start_stats.Add(stats_[i]);
+    }
   }
 
-  // Flush the active MemTable to disk (Minor Compaction)
-  // This ensures all recent writes in RAM are pushed to Level 0 before we sweep.
   TEST_CompactMemTable();
-
-  // Sequentially trigger Major Compaction for every level
-  // We loop up to config::kNumLevels - 1 (Level 5 merges into Level 6).
-  // Passing nullptr for start and end tells LevelDB to "compact the entire alphabetical range".
   for (int level = 0; level < config::kNumLevels - 1; level++) {
     TEST_CompactRange(level, nullptr, nullptr);
   }
 
-  // Snapshot the ending global statistics AFTER all work is done
   CompactionStats end_stats;
-  for (int i = 0; i < config::kNumLevels; i++) {
-    end_stats.Add(stats_[i]);
+  {
+    MutexLock l(&mutex_);
+    for (int i = 0; i < config::kNumLevels; i++) {
+      end_stats.Add(stats_[i]);
+    }
   }
 
-  // Calculate the delta (what happened exclusively during our manual run)
-  long long total_executed = end_stats.compactions_executed - start_stats.compactions_executed;
-  long long total_input_files = end_stats.input_files - start_stats.input_files;
-  long long total_output_files = end_stats.output_files - start_stats.output_files;
-  long long total_bytes_read = end_stats.bytes_read - start_stats.bytes_read;
-  long long total_bytes_written = end_stats.bytes_written - start_stats.bytes_written;
+  long long total_executed =
+      end_stats.compactions_executed - start_stats.compactions_executed;
+  long long total_input_files =
+      end_stats.input_files - start_stats.input_files;
+  long long total_output_files =
+      end_stats.output_files - start_stats.output_files;
+  long long total_bytes_read =
+      end_stats.bytes_read - start_stats.bytes_read;
+  long long total_bytes_written =
+      end_stats.bytes_written - start_stats.bytes_written;
 
-  // Print the human-readable summary required by the assignment
   printf("\n=========================================\n");
   printf("    MANUAL FULL COMPACTION STATISTICS    \n");
   printf("=========================================\n");
