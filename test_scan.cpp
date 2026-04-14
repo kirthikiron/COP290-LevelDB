@@ -11,14 +11,14 @@ int main() {
     leveldb::Options options;
     options.create_if_missing = true;
 
-    // 1. Open the database
+    // Open the database
     leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
     if (!status.ok()) {
         std::cerr << "Failed to open database: " << status.ToString() << std::endl;
         return 1;
     }
 
-    // 2. Insert some test data (Alphabetical)
+    // Insert some test data (Alphabetical)
     leveldb::WriteOptions write_options;
     db->Put(write_options, "apple", "red");
     db->Put(write_options, "banana", "yellow");
@@ -26,7 +26,7 @@ int main() {
     db->Put(write_options, "date", "brown");
     db->Put(write_options, "elderberry", "purple");
 
-    // 3. Test the new Range Scan API!
+    // Test the new Range Scan API!
     // We want a half-open interval ["b", "e")
     // This should grab banana, cherry, and date, but STOP before elderberry.
     leveldb::ReadOptions read_options;
@@ -35,7 +35,7 @@ int main() {
     std::cout << "Scanning from 'apple' to 'date'...\n";
     status = db->Scan(read_options, "apple", "date", &results);
 
-    // 4. Print the results
+    // Print the results
     if (status.ok()) {
         std::cout << "Scan successful! Found " << results.size() << " items:\n";
         for (const auto& pair : results) {
@@ -45,7 +45,7 @@ int main() {
         std::cerr << "Scan failed: " << status.ToString() << std::endl;
     }
 
-    // 5. Clean up
+    // Clean up
     delete db;
     return 0;
 }

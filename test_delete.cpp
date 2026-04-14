@@ -10,14 +10,14 @@ int main() {
     leveldb::Options options;
     options.create_if_missing = true;
 
-    // 1. Open the database
+    // Open the database
     leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
     if (!status.ok()) {
         std::cerr << "Failed to open database: " << status.ToString() << std::endl;
         return 1;
     }
 
-    // 2. Insert test data
+    // Insert test data
     std::cout << "Inserting test data...\n";
     leveldb::WriteOptions write_options;
     db->Put(write_options, "apple", "red");
@@ -28,7 +28,7 @@ int main() {
     db->Put(write_options, "fig", "green");
     db->Put(write_options, "grape", "purple");
 
-    // 3. Test the Range Delete API
+    // Test the Range Delete API
     // Half-open interval ["banana", "fig")
     // This MUST delete: banana, cherry, date, elderberry.
     // This MUST KEEP: apple, fig, grape.
@@ -41,7 +41,7 @@ int main() {
         return 1;
     }
 
-    // 4. Verify the database contents using a standard iterator
+    // Verify the database contents using a standard iterator
     std::cout << "\nScanning remaining database keys:\n";
     std::cout << "---------------------------------\n";
     leveldb::Iterator* it = db->NewIterator(leveldb::ReadOptions());
@@ -55,7 +55,7 @@ int main() {
     std::cout << "---------------------------------\n";
     std::cout << "Total keys remaining: " << count << " (Expected: 3)\n";
 
-    // 5. Clean up
+    // Clean up
     delete it;
     delete db;
     return 0;
