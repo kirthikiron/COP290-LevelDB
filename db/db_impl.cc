@@ -136,6 +136,8 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       table_cache_(new TableCache(dbname_, options_, TableCacheSize(options_))),
       db_lock_(nullptr),
       shutting_down_(false),
+      manual_full_compaction_active_(false),  ///////////////////////////////////////////////////////////
+      full_compaction_cv_(&mutex_),           //End//////////////////////////////////////////////////////
       background_work_finished_signal_(&mutex_),
       mem_(nullptr),
       imm_(nullptr),
@@ -1106,6 +1108,12 @@ Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
                                       SequenceNumber* latest_snapshot,
                                       uint32_t* seed) {
   mutex_.Lock();
+  //////////////////////////////////////////////////////////////////////////////
+  // Added logic to wait for any active manual full compaction to finish before allowing new writes to proceed.
+  while (manual_full_compaction_active_) {
+      full_compaction_cv_.Wait();
+  }
+  //End/////////////////////////////////////////////////////////////////////////
   *latest_snapshot = versions_->LastSequence();
 
   // Collect together all needed child iterators
@@ -1144,6 +1152,12 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    std::string* value) {
   Status s;
   MutexLock l(&mutex_);
+  //////////////////////////////////////////////////////////////////////////////
+  // Added logic to wait for any active manual full compaction to finish before allowing new writes to proceed.
+  while (manual_full_compaction_active_) {
+      full_compaction_cv_.Wait();
+  }
+  //End/////////////////////////////////////////////////////////////////////////
   SequenceNumber snapshot;
   if (options.snapshot != nullptr) {
     snapshot =
@@ -1268,25 +1282,63 @@ Status DBImpl::DeleteRange(const WriteOptions& options,
 }
 
 Status DBImpl::ForceFullCompaction() {
+
+  // Flush RAM to Disk first before locking down
+  TEST_CompactMemTable();
+  
   CompactionStats start_stats;
   {
     MutexLock l(&mutex_);
+    // Activate global lockdown 
+    manual_full_compaction_active_ = true;
+    
+    // Safely read stats while holding the lock
     for (int i = 0; i < config::kNumLevels; i++) {
       start_stats.Add(stats_[i]);
     }
   }
 
-  TEST_CompactMemTable();
-  for (int level = 0; level < config::kNumLevels - 1; level++) {
+  
+
+  // ALWAYS compact Level 0. (L0 files are allowed to overlap with each other)
+  TEST_CompactRange(0, nullptr, nullptr);
+
+  // --- ADDED FOR POINT 5: SMART CASCADE ---
+  // Only compact Level L (for L > 0) if there is data in deeper levels!
+  for (int level = 1; level < config::kNumLevels - 1; level++) {
+    bool has_files_below = false;
+    
+    // Safely check the LSM-tree manifest for deeper files
+    {
+      MutexLock l(&mutex_); // Must lock here to read versions_ safely!
+      for (int deeper_level = level + 1; deeper_level < config::kNumLevels; deeper_level++) {
+        if (versions_->current()->NumFiles(deeper_level) > 0) {
+          has_files_below = true;
+          break;
+        }
+      }
+    }
+
+    // If all deeper levels are completely empty, doing a manual compaction here
+    // is "useless pushing" and violates the TA constraint. Stop the cascade!
+    if (!has_files_below) {
+      break; 
+    }
+
     TEST_CompactRange(level, nullptr, nullptr);
   }
 
   CompactionStats end_stats;
   {
     MutexLock l(&mutex_);
+    // Safely read end stats
     for (int i = 0; i < config::kNumLevels; i++) {
       end_stats.Add(stats_[i]);
     }
+    
+    // Deactivate lockdown and wake up waiting ops
+    manual_full_compaction_active_ = false;
+    full_compaction_cv_.SignalAll();
   }
 
   long long total_executed =
@@ -1347,6 +1399,12 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   w.done = false;
 
   MutexLock l(&mutex_);
+  //////////////////////////////////////////////////////////////////////////////
+  // Added logic to wait for any active manual full compaction to finish before allowing new writes to proceed.
+  while (manual_full_compaction_active_) {
+      full_compaction_cv_.Wait();
+  }
+  //End/////////////////////////////////////////////////////////////////////////
   writers_.push_back(&w);
   while (!w.done && &w != writers_.front()) {
     w.cv.Wait();

@@ -136,6 +136,7 @@ class DBImpl : public DB {
     int64_t compactions_executed; // Added for Part D 
     int64_t input_files;          // Added for Part D 
     int64_t output_files;         // Added for Part D 
+
   };
   //End/////////////////////////////////////////////////////////////////////////
 
@@ -211,6 +212,14 @@ class DBImpl : public DB {
 
   // State below is protected by mutex_
   port::Mutex mutex_;
+
+  ///////////////////////////////////////////////////////////////////////////
+  
+  // We must introduce an active "lockdown" flag and a condition variable
+  // that physically forces all reads and writes to wait until the manual compaction is done.
+  bool manual_full_compaction_active_ GUARDED_BY(mutex_);
+  port::CondVar full_compaction_cv_ GUARDED_BY(mutex_);
+    //End//////////////////////////////////////////////////////////////////////
   std::atomic<bool> shutting_down_;
   port::CondVar background_work_finished_signal_ GUARDED_BY(mutex_);
   MemTable* mem_;
